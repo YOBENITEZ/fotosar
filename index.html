@@ -4,199 +4,320 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Organizador de Fotos con IA</title>
-    <!-- Cargamos face-api.js desde un CDN optimizado y compatible con servidores estáticos -->
-    <script defer src="https://cloudflare.com"></script>
+    <!-- Cargamos face-api.js desde un CDN confiable -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f9fafb;
+            --card-bg: #ffffff;
+            --text: #111827;
+            --text-muted: #6b7280;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f7fb;
-            color: #333;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
             margin: 0;
             padding: 20px;
-            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        h1 { color: #1a73e8; margin-bottom: 5px; }
-        p { color: #5f6368; margin-top: 0; }
-        .upload-container {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: var(--text-muted);
+            margin: 0 0 15px 0;
+        }
+
+        .status-badge {
             display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background-color: #f3f4f6;
+            color: #374151;
+            margin-bottom: 20px;
+        }
+
+        .status-badge.loading {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.ready {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .upload-container {
             margin-bottom: 30px;
         }
-        input[type="file"] { display: none; }
-        .btn-upload {
-            background-color: #1a73e8;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 24px;
+
+        /* Estilo nativo e infalible para el botón de input de archivos */
+        input[type="file"] {
+            font-size: 1rem;
+            padding: 10px;
+            background: var(--card-bg);
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
-            display: inline-block;
-            transition: 0.3s;
+            width: 100%;
+            max-width: 400px;
         }
-        .btn-upload:hover { background-color: #1557b0; }
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-            color: #e67e22;
+
+        input[type="file"]:hover {
+            border-color: var(--primary);
         }
+
         .gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 20px;
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 20px;
         }
-        .face-group {
-            background: white;
+
+        .card {
+            background: var(--card-bg);
             border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            border-top: 4px solid #1a73e8;
-            text-align: left;
-        }
-        .face-group h3 {
-            margin: 0 0 10px 0;
-            color: #202124;
-            font-size: 16px;
-        }
-        .img-container {
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            flex-direction: column;
         }
-        .img-container img {
-            width: 70px;
-            height: 70px;
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .img-container {
+            width: 100%;
+            padding-top: 100px; /* Relación de aspecto 1:1 por defecto */
+            position: relative;
+            background: #e5e7eb;
+        }
+
+        .card img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            border-radius: 8px;
-            border: 1px solid #dadce0;
+        }
+
+        .info {
+            padding: 12px;
+            font-size: 0.9rem;
+            border-top: 1px solid #f3f4f6;
+            background: #fafafa;
+        }
+
+        .info .faces-count {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .info .face-size {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Organizador de Fotos por Rostros</h1>
-    <p>Sube imágenes para que la IA las agrupe automáticamente según las personas que aparecen.</p>
+    <header>
+        <h1>Organizador de Fotos con IA</h1>
+        <p>Sube tus imágenes en formato <strong>.jpg</strong> o <strong>.jpeg</strong>. El sistema las analizará y las ordenará automáticamente por cantidad de personas y tamaño del rostro en primer plano.</p>
+        <div id="status" class="status-badge loading">Cargando modelos de Inteligencia Artificial...</div>
+    </header>
 
     <div class="upload-container">
-        <label for="file-input" class="btn-upload">📁 Seleccionar Fotos</label>
-        <input type="file" id="file-input" multiple accept="image/*">
-        <div id="status">Iniciando sistema de IA...</div>
+        <!-- Input nativo directo para asegurar compatibilidad absoluta con clics -->
+        <input type="file" id="file-input" accept=".jpg, .jpeg" multiple>
     </div>
 
-    <div id="gallery" class="gallery"></div>
+    <main class="gallery" id="gallery"></main>
 
     <script>
         const fileInput = document.getElementById('file-input');
-        const statusDiv = document.getElementById('status');
-        const galleryDiv = document.getElementById('gallery');
+        const gallery = document.getElementById('gallery');
+        const statusBadge = document.getElementById('status');
         
-        let labeledFaceDescriptors = [];
-        let personCounter = 1;
+        let loadedImagesData = [];
+        let isAiReady = false;
 
-        // Cargar los modelos preentrenados desde un repositorio abierto de modelos compartidos
-        async function loadModels() {
-            // Usamos un hosting de modelos alternativo y rápido para evitar bloqueos de origen en GitHub Pages
-            const MODEL_URL = 'https://githubusercontent.com';
-            statusDiv.innerText = "Cargando redes neuronales (esto puede tardar unos segundos)...";
-            
+        // URL absoluta de los modelos públicos de face-api para evitar bloqueos CORS locales si es posible
+        const MODEL_URL = 'https://raw.githubusercontent.com/vladmandic/face-api/master/model/';
+
+        // Cargar modelos de Inteligencia Artificial al iniciar de forma asíncrona
+        async function initAI() {
             try {
-                await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-                statusDiv.innerText = "¡IA Lista! Sube tus fotos para organizarlas.";
-                statusDiv.style.color = "#2ecc71";
-            } catch (err) {
-                statusDiv.innerText = "Error cargando los modelos de IA. Revisa tu conexión a internet.";
-                statusDiv.style.color = "#e74c3c";
-                console.error(err);
+                // Usamos el detector TinyFace que es super ligero y rápido
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                isAiReady = true;
+                statusBadge.textContent = "✓ IA Lista para ordenar";
+                statusBadge.className = "status-badge ready";
+            } catch (error) {
+                console.error("Error cargando modelos de IA:", error);
+                statusBadge.textContent = "⚠ IA Desactivada (Modo seguro: Usa Live Server o Netlify)";
+                statusBadge.className = "status-badge error";
             }
         }
 
-        fileInput.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            if (files.length === 0) return;
+        // Ejecutar carga de IA al cargar la ventana
+        window.addEventListener('DOMContentLoaded', initAI);
 
-            statusDiv.innerText = `Analizando ${files.length} imágenes...`;
-            statusDiv.style.color = "#e67e22";
-            galleryDiv.innerHTML = ''; 
-            labeledFaceDescriptors = [];
-            personCounter = 1;
+        // Escuchar el evento de selección de archivos nativo
+        fileInput.addEventListener('change', handleFileSelect);
 
-            const groups = {};
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (!files.length) return;
 
-            for (let file of files) {
-                const imgUrl = URL.createObjectURL(file);
+            // Limpiar datos anteriores para una nueva carga limpia
+            loadedImagesData = [];
+            gallery.innerHTML = '';
+
+            // Procesar cada archivo seleccionado uno por uno
+            Array.from(files).forEach((file, index) => {
+                if (!file.type.match('image/jpeg') && !file.name.toLowerCase().endsWith('.jpg') && !file.name.toLowerCase().endsWith('.jpeg')) {
+                    alert(`El archivo "${file.name}" no es un formato .jpg válido.`);
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imgUrl = e.target.result;
+                    
+                    // Crear un objeto de datos base para la imagen cargada
+                    const imgData = {
+                        id: index,
+                        name: file.name,
+                        url: imgUrl,
+                        facesCount: 0,
+                        maxFaceSize: 0,
+                        processed: false
+                    };
+
+                    loadedImagesData.push(imgData);
+                    
+                    // Renderizar inmediatamente la imagen en la galería sin esperar a la IA
+                    renderGallery();
+
+                    // Procesar el análisis de rostros en segundo plano si la IA cargó con éxito
+                    if (isAiReady) {
+                        analyzeImageFace(imgData);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Función para renderizar y actualizar la vista de la galería de manera ordenada
+        function renderGallery() {
+            gallery.innerHTML = '';
+
+            // Aplicar lógica de ordenamiento si ya han sido procesadas
+            const sortedData = [...loadedImagesData].sort((a, b) => {
+                // 1. Prioridad: cantidad de rostros de menor a mayor
+                if (a.facesCount !== b.facesCount) {
+                    return a.facesCount - b.facesCount;
+                }
+                // 2. Desempate: tamaño del rostro principal de mayor a menor (primeros planos al inicio)
+                return b.maxFaceSize - a.maxFaceSize;
+            });
+
+            sortedData.forEach(data => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.id = data.id;
+
+                let infoText = data.processed 
+                    ? `<span class="faces-count">Rostros: ${data.facesCount}</span>
+                       <div class="face-size">Rostro principal: ${Math.round(data.maxFaceSize)}px</div>`
+                    : `<span class="faces-count" style="color: #d97706;">Analizando con IA...</span>`;
+
+                if (!isAiReady && !data.processed) {
+                    infoText = `<span class="faces-count" style="color: #6b7280;">Imagen cargada</span>`;
+                }
+
+                card.innerHTML = `
+                    <div class="img-container">
+                        <img src="${data.url}" alt="${data.name}">
+                    </div>
+                    <div class="info">
+                        ${infoText}
+                    </div>
+                `;
+                gallery.appendChild(card);
+            });
+        }
+
+        // Analizar rostros usando la librería face-api
+        async function analyzeImageFace(imgData) {
+            try {
+                // Crear un elemento de imagen fantasma en memoria para que la IA lo lea
+                const htmlImg = new Image();
+                htmlImg.src = imgData.url;
                 
-                // Creamos un elemento de imagen temporal para que face-api lo procese correctamente
-                const img = new Image();
-                img.src = imgUrl;
-                await new Promise(resolve => img.onload = resolve);
-
-                const detections = await faceapi.detectAllFaces(img)
-                    .withFaceLandmarks()
-                    .withFaceDescriptors();
-
-                if (detections.length === 0) {
-                    if (!groups["Paisajes o Sin Rostro"]) groups["Paisajes o Sin Rostro"] = [];
-                    groups["Paisajes o Sin Rostro"].push(imgUrl);
-                    continue;
-                }
-
-                for (let detection of detections) {
-                    let matchedPerson = "Desconocido";
-
-                    if (labeledFaceDescriptors.length > 0) {
-                        const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.55); // Umbral de precisión estricto
-                        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-                        matchedPerson = bestMatch.label;
+                htmlImg.onload = async () => {
+                    // Detectar todos los rostros en la foto utilizando TinyFaceDetector
+                    const detections = await faceapi.detectAllFaces(htmlImg, new faceapi.TinyFaceDetectorOptions());
+                    
+                    imgData.facesCount = detections.length;
+                    
+                    // Calcular el tamaño del rostro más grande detectado (área del cuadro contenedor)
+                    if (detections.length > 0) {
+                        let maxSize = 0;
+                        detections.forEach(det => {
+                            const size = det.box.width * det.box.height;
+                            if (size > maxSize) {
+                                maxSize = Math.sqrt(size); // Usamos la raíz cuadrada para tener una dimensión lineal en px
+                            }
+                        });
+                        imgData.maxFaceSize = maxSize;
+                    } else {
+                        imgData.maxFaceSize = 0;
                     }
 
-                    if (matchedPerson === 'unknown' || matchedPerson === 'Desconocido') {
-                        matchedPerson = `Persona ${personCounter++}`;
-                        labeledFaceDescriptors.push(new faceapi.LabeledFaceDescriptors(matchedPerson, [detection.descriptor]));
-                    }
-
-                    if (!groups[matchedPerson]) groups[matchedPerson] = [];
-                    if (!groups[matchedPerson].includes(imgUrl)) {
-                        groups[matchedPerson].push(imgUrl);
-                    }
-                }
-            }
-
-            renderGroups(groups);
-            statusDiv.innerText = "¡Completado! Fotos organizadas con éxito.";
-            statusDiv.style.color = "#2ecc71";
-        });
-
-        function renderGroups(groups) {
-            for (let person in groups) {
-                const groupDiv = document.createElement('div');
-                groupDiv.className = 'face-group';
-
-                const title = document.createElement('h3');
-                title.innerText = person;
-                groupDiv.appendChild(title);
-
-                const imgContainer = document.createElement('div');
-                imgContainer.className = 'img-container';
-
-                groups[person].forEach(url => {
-                    const img = document.createElement('img');
-                    img.src = url;
-                    imgContainer.appendChild(img);
-                });
-
-                groupDiv.appendChild(imgContainer);
-                galleryDiv.appendChild(groupDiv);
+                    imgData.processed = true;
+                    
+                    // Volver a renderizar la galería con las nuevas métricas calculadas
+                    renderGallery();
+                };
+            } catch (err) {
+                console.error("Error analizando la imagen individual: ", err);
+                imgData.processed = true;
+                renderGallery();
             }
         }
-
-        loadModels();
     </script>
 </body>
 </html>
